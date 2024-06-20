@@ -1,0 +1,32 @@
+{
+    "name": "redux-cqrs",
+    "version": "1.6.1",
+    "description": "A Redux package implementing CQRS architecture.",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist",
+        "src",
+        "index.js",
+        "index.ts",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "tsc"
+    },
+    "keywords": [
+        "redux",
+        "cqrs",
+        "command",
+        "event"
+    ],
+    "author": "hroc",
+    "license": "MIT",
+    "devDependencies": {
+        "typescript": "^4.9.5"
+    },
+    "dependencies": {
+        "guid-typescript": "^1.0.9",
+        "redux": "^5.0.1"
+    }
+}
