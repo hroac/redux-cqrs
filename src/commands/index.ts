@@ -15,4 +15,5 @@ export abstract class Command implements ICommand {
   public Id: Guid;
 
   public type: string;
+  
 }

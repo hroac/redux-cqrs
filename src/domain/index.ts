@@ -3,11 +3,11 @@ import { IEvent } from '../events';
 import { Dispatch, Store } from 'redux';
 
 export abstract class BaseEntity {
-    id: Guid;
-  dispatch: Dispatch;
+    Id: Guid;
+    dispatch: Dispatch;
     constructor(dispatch: Dispatch, id: Guid) {
     this.dispatch = dispatch;
-    this.id = id;
+    this.Id = id;
   }
 }
 
@@ -26,7 +26,7 @@ export abstract class Domain extends AggregateRoot {
 
 type Constructor<T> = new (...args: any[]) => T;
 
-export function hydrateEntity<T>(store: Store, entityClass: Constructor<T>, entityId: string): T {
+export function hydrateEntity<T>(store: Store, entityClass: Constructor<T>, entityId: Guid): T {
   // Get the current state from the Redux store
   const state = store.getState();
   const stateSlice = entityClass.name.toLowerCase();
@@ -35,13 +35,22 @@ export function hydrateEntity<T>(store: Store, entityClass: Constructor<T>, enti
   const entities = state[stateSlice];
 
   // Find the entity data by ID
-  const entityData = entities[entityId];
+  const entityData = entities[entityId.toString()];
 
   // If the entity is not found, return new entity
-  if (!entityData) {
-    return new entityClass(store.dispatch, entityId);
-  }
+ const domain : any = new entityClass(store.dispatch, entityId);
 
+
+ if(entityData) {
+  Object.keys(entityData).forEach((key : string) => {
+    if (typeof entityData[key] === 'string' && entityData[key].match(/^[{]?[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}[}]?$/) && Guid.parse(entityData[key]) !== Guid.createEmpty()) {
+        domain[key] = Guid.parse(entityData[key])
+    } else {
+        domain[key] = entityData[key]
+    }
+  })
+ }
+ 
   // Use the EntityClass constructor to create a new instance
-return new entityClass(store.dispatch, ...Object.values(entityData));
+return domain as T;
 }

@@ -6,7 +6,7 @@ export class CommandDispatcher {
   private commandHandlers: Map<string, (command: ICommand) => Promise<void>> = new Map();
 
   registerHandler<T extends ICommandHandler<ICommand>>(handler: T) : void {
-    this.commandHandlers.set((handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().split('_').slice(0, 3).join('_'), handler.handle as (command: ICommand) => Promise<void>);
+    this.commandHandlers.set((handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().split('_').slice(0, (handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').split('_').indexOf('Command')+1).join('_'), handler.handle as (command: ICommand) => Promise<void>);
   }
 
   dispatch(command: ICommand): void {
@@ -24,7 +24,7 @@ export class EventDispatcher {
   private eventHandlers: Map<string, (event: IEvent) => void> = new Map();
 
   registerHandler<T extends IEventHandler<IEvent>>(handler: T): void {
-    this.eventHandlers.set((handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().split('_').slice(0, 3).join('_'), handler.handle as (event: IEvent) => void);
+    this.eventHandlers.set((handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().split('_').slice(0, (handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').split('_').indexOf('Event')+1).join('_'), handler.handle as (command: ICommand) => Promise<void>);
   }
 
   dispatch(event: IEvent): void {

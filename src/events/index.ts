@@ -11,9 +11,13 @@ export abstract class Event implements IEvent {
   constructor(id: Guid) {
       this.Id = id;
       this.type = this.constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase();
+      this.Date = new Date();
   }
 
   public Id: Guid;
 
   public type: string;
+
+  public Date: Date;
+
 }
