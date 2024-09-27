@@ -29,8 +29,7 @@ export class CommandDispatcher {
       const handler = this.commandHandlers.get(command.type);
       if (handler) {
         try {
-          const result = await handler(command);
-          return result
+          await handler(command);
         } catch (error) {
           console.error(`Error in command handler:`, error);
         }
@@ -45,22 +44,23 @@ export class CommandDispatcher {
 
 // Event Dispatcher
 export class EventDispatcher {
-  private eventHandlers: Map<string, (event: IEvent) => Promise<void>> = new Map();
+  private eventHandlers: Map<string, (event: IEvent) => IEvent> = new Map();
   private eventQueue: IEvent[] = [];
   private isProcessing: boolean = false;
 
   registerHandler<T extends IEventHandler<IEvent>>(handler: T): void {
     this.eventHandlers.set(
       (handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().split('_').slice(0, (handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').split('_').indexOf('Event') + 1).join('_'), 
-      handler.handle as (event: IEvent) => Promise<void>
+      handler.handle as (event: IEvent) => IEvent
     );
   }
 
-  async dispatch(event: IEvent): Promise<void> {
+  async dispatch(event: IEvent): Promise<IEvent> {
     this.eventQueue.push(event);
     if (!this.isProcessing) {
       await this.processQueue();
     }
+    return event;
   }
 
   private async processQueue(): Promise<void> {
@@ -70,8 +70,7 @@ export class EventDispatcher {
       const handler = this.eventHandlers.get(event.type);
       if (handler) {
         try {
-          const result = await handler(event);
-          return result;
+           await handler(event);
         } catch (error) {
           console.error(`Error in event handler:`, error);
         }
