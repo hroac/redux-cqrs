@@ -44,18 +44,18 @@ export class CommandDispatcher {
 
 // Event Dispatcher
 export class EventDispatcher {
-  private eventHandlers: Map<string, (event: IEvent) => IEvent> = new Map();
+  private eventHandlers: Map<string, (event: IEvent) => Promise<void>> = new Map();
   private eventQueue: IEvent[] = [];
   private isProcessing: boolean = false;
 
   registerHandler<T extends IEventHandler<IEvent>>(handler: T): void {
     this.eventHandlers.set(
       (handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().split('_').slice(0, (handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').split('_').indexOf('Event') + 1).join('_'), 
-      handler.handle as (event: IEvent) => IEvent
+      handler.handle as (event: IEvent) => Promise<void>
     );
   }
 
-  async dispatch(event: IEvent): Promise<IEvent> {
+  async dispatch(event: IEvent): Promise<void> {
     this.eventQueue.push(event);
     if (!this.isProcessing) {
       await this.processQueue();
