@@ -1,60 +1,97 @@
 
 import { ICommand } from '../commands';
 import { IEvent } from '../events';
-import { Store } from 'redux';
 
 // Command Dispatcher
 export class CommandDispatcher {
-  private commandHandlers: Map<string, (command: ICommand) => void> = new Map();
+  private commandHandlers: Map<string, (command: ICommand) => Promise<void>> = new Map();
+  private commandQueue: ICommand[] = [];
+  private isProcessing: boolean = false;
 
   registerHandler<T extends ICommandHandler<ICommand>>(handler: T): void {
-    this.commandHandlers.set((handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().split('_').slice(0, (handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').split('_').indexOf('Command') + 1).join('_'), handler.handle as (command: ICommand) => void);
+    this.commandHandlers.set(
+      (handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().split('_').slice(0, (handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').split('_').indexOf('Command') + 1).join('_'), 
+      handler.handle as (command: ICommand) => Promise<void>
+    );
   }
 
-  dispatch(command: ICommand): void {
-    const handler = this.commandHandlers.get(command.type);
-    if (handler) {
-      handler(command);
-    } else {
-      throw new Error(\`No handler registered for command type: \${command.type}\`);
+  async dispatch(command: ICommand): Promise<void> {
+    this.commandQueue.push(command);
+    if (!this.isProcessing) {
+      await this.processQueue();
     }
+  }
+
+  private async processQueue(): Promise<void> {
+    this.isProcessing = true;
+    while (this.commandQueue.length > 0) {
+      const command = this.commandQueue.shift()!;
+      const handler = this.commandHandlers.get(command.type);
+      if (handler) {
+        try {
+          await handler(command);
+        } catch (error) {
+          console.error(`Error in command handler:`, error);
+        }
+      } else {
+        console.error(`No handler registered for command type: ${command.type}`);
+      }
+    }
+    this.isProcessing = false;
   }
 }
 
 // Event Dispatcher
 export class EventDispatcher {
-  private eventHandlers: Map<string, (event: IEvent) => void> = new Map();
+  private eventHandlers: Map<string, (event: IEvent) => Promise<void>> = new Map();
+  private eventQueue: IEvent[] = [];
+  private isProcessing: boolean = false;
 
   registerHandler<T extends IEventHandler<IEvent>>(handler: T): void {
-    this.eventHandlers.set((handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().split('_').slice(0, (handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').split('_').indexOf('Event') + 1).join('_'), handler.handle as (event: IEvent) => void);
+    this.eventHandlers.set(
+      (handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().split('_').slice(0, (handler as any).constructor.name.replace(/([a-z])([A-Z])/g, '$1_$2').split('_').indexOf('Event') + 1).join('_'), 
+      handler.handle as (event: IEvent) => Promise<void>
+    );
   }
 
-  dispatch(event: IEvent): void {
-    const handler = this.eventHandlers.get(event.type);
-    if (handler) {
-      try {
-        handler(event);
-      } catch (error) {
-        console.error(`Error in event handler:`, error);
-      }
-    } else {
-      throw new Error(\`No handler registered for event type: \${event.type}\`);
+  async dispatch(event: IEvent): Promise<void> {
+    this.eventQueue.push(event);
+    if (!this.isProcessing) {
+      await this.processQueue();
     }
+  }
+
+  private async processQueue(): Promise<void> {
+    this.isProcessing = true;
+    while (this.eventQueue.length > 0) {
+      const event = this.eventQueue.shift()!;
+      const handler = this.eventHandlers.get(event.type);
+      if (handler) {
+        try {
+          await handler(event);
+        } catch (error) {
+          console.error(`Error in event handler:`, error);
+        }
+      } else {
+        console.error(`No handler registered for event type: ${event.type}`);
+      }
+    }
+    this.isProcessing = false;
   }
 }
 
 export interface ICommandHandler<T extends ICommand> {
-  handle(command: ICommand): void;
+  handle(command: ICommand): Promise<void>;
 }
 
 export interface IEventHandler<T extends IEvent> {
-  handle(event: IEvent): void;
+  handle(event: IEvent): Promise<void>;
 }
 
 export abstract class CommandHandler<T extends ICommand> implements ICommandHandler<T> {
-  abstract handle(command: ICommand): void;
+  abstract handle(command: ICommand): Promise<void>;
 }
 
 export abstract class EventHandler<T extends IEvent> implements IEventHandler<T> {
-  abstract handle(event: IEvent): void;
+  abstract handle(event: IEvent): Promise<void>;
 }
