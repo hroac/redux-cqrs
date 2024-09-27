@@ -29,7 +29,8 @@ export class CommandDispatcher {
       const handler = this.commandHandlers.get(command.type);
       if (handler) {
         try {
-          await handler(command);
+          const result = await handler(command);
+          return result
         } catch (error) {
           console.error(`Error in command handler:`, error);
         }
@@ -38,6 +39,7 @@ export class CommandDispatcher {
       }
     }
     this.isProcessing = false;
+    return;
   }
 }
 
@@ -68,7 +70,8 @@ export class EventDispatcher {
       const handler = this.eventHandlers.get(event.type);
       if (handler) {
         try {
-          await handler(event);
+          const result = await handler(event);
+          return result;
         } catch (error) {
           console.error(`Error in event handler:`, error);
         }
@@ -77,6 +80,7 @@ export class EventDispatcher {
       }
     }
     this.isProcessing = false;
+    return;
   }
 }
 
