@@ -1,6 +1,6 @@
 {
     "name": "redux-cqrs",
-    "version": "1.6.16",
+    "version": "1.6.17",
     "description": "A Redux package implementing CQRS architecture.",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",

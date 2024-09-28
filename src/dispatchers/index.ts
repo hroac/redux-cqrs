@@ -60,7 +60,7 @@ export class EventDispatcher {
     if (!this.isProcessing) {
       await this.processQueue();
     }
-    return event;
+    return;
   }
 
   private async processQueue(): Promise<void> {
