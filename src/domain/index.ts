@@ -35,7 +35,7 @@ export function hydrateEntity<T>(store: Store, entityClass: Constructor<T>, enti
   const entities = state[stateSlice];
 
   // Find the entity data by ID
-  const entityData = entities[entityId.toString()];
+  const entityData = JSON.parse(JSON.stringify(entities[entityId.toString()]));
 
   // If the entity is not found, return new entity
  const domain : any = new entityClass(store.dispatch, entityId);
