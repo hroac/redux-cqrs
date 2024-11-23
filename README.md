@@ -1,214 +1,217 @@
-# Redux CQRS Package Overview
+# Redux CQRS Integration Guide
 
-This guide provides an overview of implementing a Redux CQRS pattern with domain logic using the Redux CQRS package. It explains how to define commands and events, handle them using command and event handlers, apply business logic in domain models, and update the Redux store.
+This guide provides a comprehensive overview of implementing the CQRS (Command Query Responsibility Segregation) pattern in a Redux-based application using the 'redux-cqrs' package. We’ll demonstrate how to define commands, handle them in command handlers, apply business logic in domain models, and update the Redux store.
 
 ## Step-by-Step Implementation
 
-### 1. Define Commands and Events
+### 1. Setting Up the Redux Store with CQRS Middleware
 
-Create command and event classes to represent actions and their outcomes.
+Set up the Redux store to use the CQRS middleware, which will intercept and route commands and events.
 
-```typescript
-// src/redux/cqrs/updateItemCommands.ts
-
-import { ICommand } from 'redux-cqrs/src/commands';
-import { IEvent } from 'redux-cqrs/src/events';
-
-// Command for updating an item
-export class UpdateItemCommand implements ICommand {
-  type = 'UPDATE_ITEM_COMMAND';
-  constructor(public itemId: string, public newItemName: string, public newQuantity: number) {}
-}
-
-// Event for item updated
-export class ItemUpdatedEvent implements IEvent {
-  type = 'ITEM_UPDATED_EVENT';
-  constructor(public itemId: string, public newItemName: string, public newQuantity: number) {}
-}
-```
-
-### 2. Implement Command and Event Handlers
-
-Create handlers to process commands and update the state in response to events.
-
-```typescript
-// src/redux/cqrs/handlers.ts
-
-import { CommandHandler, EventHandler } from 'redux-cqrs/src/dispatchers';
-import { UpdateItemCommand, ItemUpdatedEvent } from './updateItemCommands';
-import { store } from '../store';
-import { Item } from './domain/itemDomain';
-import { updateItemInStore } from '../reducers/itemReducer';
-
-// Command Handler for UpdateItemCommand
-export class UpdateItemCommandHandler extends CommandHandler<UpdateItemCommand> {
-  async handle(command: UpdateItemCommand): Promise<void> {
-    try {
-      const response = await fetch(\`https://api.example.com/items/\${command.itemId}\`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: command.newItemName, quantity: command.newQuantity }),
-      });
-
-      if (response.ok) {
-        const item = new Item(command.itemId, command.newItemName, command.newQuantity);
-        const event = item.updateItem(command.newItemName, command.newQuantity);
-        store.dispatch(event);
-      } else {
-        console.error('Failed to update item:', response.statusText);
-      }
-    } catch (error) {
-      console.error('API call failed:', error);
-    }
-  }
-}
-
-// Event Handler for ItemUpdatedEvent
-export class ItemUpdatedEventHandler extends EventHandler<ItemUpdatedEvent> {
-  handle(event: ItemUpdatedEvent): void {
-    store.dispatch(updateItemInStore(event));
-  }
-}
-```
-
-### 3. Update the Domain Model
-
-Extend the domain model to apply business logic and manage state changes.
-
-```typescript
-// src/redux/cqrs/domain/itemDomain.ts
-
-import { AggregateRoot } from 'redux-cqrs/src/domain';
-import { ItemUpdatedEvent } from '../updateItemCommands';
-
-export class Item extends AggregateRoot {
-  itemName: string;
-  quantity: number;
-
-  constructor(id: string, itemName: string, quantity: number) {
-    super(id);
-    this.itemName = itemName;
-    this.quantity = quantity;
-  }
-
-  updateItem(newItemName: string, newQuantity: number): ItemUpdatedEvent {
-    const event = new ItemUpdatedEvent(this.id, newItemName, newQuantity);
-    this.applyChange(event);  // Apply and store the event
-    return event;
-  }
-
-  protected apply(event: ItemUpdatedEvent): void {
-    if (event instanceof ItemUpdatedEvent) {
-      this.itemName = event.newItemName;
-      this.quantity = event.newQuantity;
-    }
-  }
-}
-```
-
-### 4. Modify the Reducer
-
-Update the Redux store in response to events.
-
-```typescript
-// src/redux/reducers/itemReducer.ts
-
-import { IEvent } from 'redux-cqrs/src/events';
-import { ItemUpdatedEvent } from '../cqrs/updateItemCommands';
-
-const ITEM_UPDATED = 'ITEM_UPDATED';
-
-export const updateItemInStore = (event: ItemUpdatedEvent) => ({
-  type: ITEM_UPDATED,
-  payload: event,
-});
-
-const initialState = { items: [] };
-
-const itemReducer = (state = initialState, action: { type: string; payload: any }) => {
-  switch (action.type) {
-    case ITEM_UPDATED:
-      return {
-        ...state,
-        items: state.items.map(item =>
-          item.id === action.payload.itemId
-            ? { ...item, name: action.payload.newItemName, quantity: action.payload.newQuantity }
-            : item
-        ),
-      };
-    default:
-      return state;
-  }
-};
-
-export default itemReducer;
-```
-
-### 5. Integrate with the Store
-
-Register handlers and integrate middleware in your store configuration.
-
-```typescript
-// src/redux/store.ts
+````typescript
+// ./cqrs/store.ts
 
 import { createStore, applyMiddleware } from 'redux';
+import { CommandDispatcher, EventDispatcher, createCQRSReduxMiddleware } from 'redux-cqrs';
 import rootReducer from './reducers';
-import { CommandDispatcher, EventDispatcher } from 'redux-cqrs/src/dispatchers';
-import { createCQRSReduxMiddleware } from 'redux-cqrs/src/middleware';
-import { UpdateItemCommandHandler, ItemUpdatedEventHandler } from './cqrs/handlers';
 
-const commandDispatcher = new CommandDispatcher();
-const eventDispatcher = new EventDispatcher();
-
-commandDispatcher.registerHandler('UPDATE_ITEM_COMMAND', new UpdateItemCommandHandler());
-eventDispatcher.registerHandler('ITEM_UPDATED_EVENT', new ItemUpdatedEventHandler());
+export const commandDispatcher = new CommandDispatcher();
+export const eventDispatcher = new EventDispatcher();
 
 const cqrsMiddleware = createCQRSReduxMiddleware(commandDispatcher, eventDispatcher);
 
-const store = createStore(
-  rootReducer,
-  applyMiddleware(cqrsMiddleware)
-);
+const store = createStore(rootReducer, applyMiddleware(cqrsMiddleware));
 
 export default store;
-```
+````
 
-### 6. Create a Component to Dispatch Commands
+### 2. Defining the Login Command
 
-Use the command in a React component to update an item.
+Define the 'LoginUserCommand' to represent a login action. This command will encapsulate the data required for a login attempt and be handled by a command handler.
 
-```typescript
-// src/components/UpdateItemComponent.tsx
+````typescript
+// ./cqrs/commands/user/LoginUserCommand.ts
 
-import React from 'react';
-import { useDispatch } from 'react-redux';
-import { UpdateItemCommand } from '../redux/cqrs/updateItemCommands';
+import { Command } from '../Command';
+import { Guid } from 'guid-typescript';
 
-const UpdateItemComponent: React.FC = () => {
-  const dispatch = useDispatch();
+export class LoginUserCommand extends Command {
+  constructor(userId: Guid, accessToken: string) {
+    super(userId);
+    this.AccessToken = accessToken;
+  }
 
-  const updateItem = () => {
-    const command = new UpdateItemCommand('1', 'Updated Item Name', 20);
-    dispatch(command);
-  };
+  public AccessToken: string;
+}
+````
 
-  return (
-    <div>
-      <button onClick={updateItem}>Update Item</button>
-    </div>
-  );
+### 3. Implementing the Command Handler
+
+The 'LoginUserCommandHandler' processes the 'LoginUserCommand', interacts with the 'User' domain, and updates the user state. Command handlers are responsible for executing any logic related to the command.
+
+````typescript
+// ./cqrs/handlers/user/LoginUserCommandHandler.ts
+
+import { CommandHandler } from 'redux-cqrs';
+import { LoginUserCommand } from '../../commands/user';
+import { User } from '../../domains/User';
+import { hydrateEntity } from 'redux-cqrs';
+import store from '../../store';
+
+export class LoginUserCommandHandler extends CommandHandler<LoginUserCommand> {
+  async handle(command: LoginUserCommand): Promise<void> {
+    const user = hydrateEntity(store, User, command.Id);
+    user.login(command.AccessToken, '', '', false);
+  }
+}
+````
+
+In this handler:
+- **Domain Hydration**: The 'User' domain is fetched using 'hydrateEntity'.
+- **Domain Method Execution**: The 'user.login()' method is called with data from the command.
+
+### 4. Defining the Login Event
+
+Define the 'UserLoggedInEvent' class to represent the successful login event. Events are used to capture and propagate the results of commands.
+
+````typescript
+// ./cqrs/events/user/UserLoggedInEvent.ts
+
+import { Event } from 'redux-cqrs';
+import { Guid } from 'guid-typescript';
+
+export class UserLoggedInEvent extends Event {
+  constructor(userId: Guid, email: string, name: string, premium: boolean) {
+    super(userId);
+    this.Email = email;
+    this.Name = name;
+    this.Premium = premium;
+  }
+
+  public Email: string;
+  public Name: string;
+  public Premium: boolean;
+}
+````
+
+### 5. Updating the Domain Model
+
+The 'User' domain model encapsulates the business logic for handling user-related actions. It defines the 'login' method, which applies the 'UserLoggedInEvent' upon successful login. This domain model aligns with your current project structure and handles events through the 'apply' method.
+
+````typescript
+// ./cqrs/domains/User.ts
+
+import { Domain } from './Domain';
+import { IEvent } from 'redux-cqrs/';
+import { Address } from '../../../../../Template/implementations';
+import { UserCreatedEvent, UserLoggedInEvent, UserLoggedOutEvent, PremiumUnlockedEvent, ResultsSavedEvent } from '../events/user';
+import { Dispatch } from 'redux';
+import { Guid } from 'guid-typescript';
+import store from '../store';
+
+export class User extends Domain {
+  constructor(dispatch: Dispatch, id: Guid, name: string, email: string, password: string, DoB: Date, address: Address, role: number) {
+    super(dispatch, id);
+    this.Name = name;
+    this.Email = email;
+    this.Password = password;
+    this.DoB = DoB;
+    this.Address = address;
+    this.Role = role;
+  }
+
+  public Name!: string;
+  public Email!: string;
+  public Password!: string;
+  public DoB!: Date;
+  public Address!: Address;
+  public Role!: number;
+  public AccessToken!: string;
+  public LastLogin!: Date;
+  public Premium!: boolean;
+
+  public login(accessToken: string, email: string, name: string, premium: boolean): void {
+    this.Email = email;
+    this.Name = name;
+    this.AccessToken = accessToken;
+    this.apply(new UserLoggedInEvent(this.Id, this.Email, this.Name, premium));
+  }
+
+  public apply(event: IEvent): void {
+    store.dispatch(event);
+  }
+}
+````
+
+### 6. Updating the Auth Reducer
+
+The 'authReducer' listens for the 'UserLoggedInEvent' and updates the Redux store to reflect the authenticated user state.
+
+````typescript
+// ./cqrs/reducers/auth/authReducer.ts
+
+import { IEvent, ActionType } from 'redux-cqrs';
+import { UserLoggedInEvent } from '../../events/user/UserLoggedInEvent';
+
+interface AuthState {
+  isAuthenticated: boolean;
+  userId: string;
+  email?: string;
+  name?: string;
+}
+
+const initialState: AuthState = {
+  isAuthenticated: false,
+  userId: '',
 };
 
-export default UpdateItemComponent;
-```
+export const authReducer = (state = initialState, action: IEvent): AuthState => {
+  if (action.type.toUpperCase() === ActionType(UserLoggedInEvent)) {
+    const event = action as UserLoggedInEvent;
+    return {
+      ...state,
+      isAuthenticated: true,
+      userId: event.Id.toString(),
+      email: event.Email,
+      name: event.Name,
+    };
+  }
+
+  return state;
+};
+````
+
+### 7. Implementing the Login Component
+
+Create a 'LoginContainer' component to dispatch the 'LoginUserCommand'. This component initializes the command with the user ID and access token, then dispatches it.
+
+````typescript
+// ./components/Login/Container.tsx
+
+import React from 'react';
+import { commandDispatcher } from '../../cqrs/store';
+import { LoginUserCommand } from '../../cqrs/commands/user/LoginUserCommand';
+import { Guid } from 'guid-typescript';
+
+const LoginContainer: React.FC = () => {
+  const handleLogin = (accessToken: string) => {
+    const userId = Guid.create();
+    commandDispatcher.dispatch(new LoginUserCommand(userId, accessToken));
+  };
+
+  return <LoginPage onLogin={handleLogin} />;
+};
+
+export default LoginContainer;
+````
 
 ## Summary
 
-1. **Commands and Events**: Define what actions should occur and their outcomes.
-2. **Handlers**: Process commands, make API calls, and handle events to update the store.
-3. **Domain Model**: Encapsulate business logic and manage state changes.
-4. **Reducers**: Update Redux store based on events.
-5. **Middleware and Store Integration**: Ensure commands and events flow through the middleware.
-6. **React Component**: Use commands to perform actions within your app.
+1. **Commands**: Define actions that change the system’s state.
+2. **Command Handlers**: Process commands and execute related logic in the domain model.
+3. **Events**: Capture the results of commands and are used to update the store.
+4. **Domain Model**: Encapsulate business logic and manage state changes.
+5. **Reducers**: Update Redux store in response to events.
+6. **React Component**: Dispatch commands to perform actions within the application.
 
-This README provides a comprehensive overview and example of using the Redux CQRS package to implement a feature in a Redux-based project.
+This guide demonstrates how to establish a clear CQRS structure in your project using 'redux-cqrs', ensuring maintainability, scalability, and efficient state management.
